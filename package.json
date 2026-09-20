@@ -1,0 +1,43 @@
+{
+  "name": "coc-codeql",
+  "version": "0.1.0",
+  "description": "CodeQL language support for coc.nvim, powered by a bundled tree-sitter grammar",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "keywords": [
+    "coc",
+    "coc.nvim",
+    "codeql",
+    "ql",
+    "tree-sitter",
+    "highlight"
+  ],
+  "engines": {
+    "coc": ">=0.0.82"
+  },
+  "packageManager": "pnpm@12.5.1",
+  "activationEvents": [
+    "*"
+  ],
+  "scripts": {
+    "build": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('fs').rmSync('lib',{recursive:true,force:true})\"",
+    "prepare": "node esbuild.js"
+  },
+  "author": "nitrocao",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "coc.nvim": "^0.0.83-next.9",
+    "esbuild": "^0.24.2",
+    "typescript": "^5.7.2"
+  },
+  "files": [
+    "lib",
+    "lua",
+    "README.md",
+    "LICENSE"
+  ]
+}
