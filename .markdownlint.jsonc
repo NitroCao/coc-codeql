@@ -1,0 +1,16 @@
+// markdownlint configuration, read by markdownlint-cli2 (`pnpm lint:md`),
+// coc-markdownlint and editor integrations like the VS Code markdownlint
+// extension.
+// Rule settings only: markdownlint-cli2 is invoked with an explicit glob
+// that excludes node_modules (see package.json), and nothing else in this
+// repo has Markdown files to ignore.
+{
+  // Line length is not enforced below 131: tables, links and code blocks
+  // run long.
+  "MD013": {
+    "line_length": 130
+  },
+  // Bold text is used as a group label (not a heading) in the README
+  // roadmap.
+  "MD036": false
+}

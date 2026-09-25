@@ -1,9 +1,8 @@
 {
   "name": "coc-codeql",
   "version": "0.1.0",
-  "description": "CodeQL language support for coc.nvim, powered by a bundled tree-sitter grammar",
+  "description": "CodeQL language support for coc.nvim: language server integration, filetype detection and tree-sitter highlighting",
   "main": "lib/index.js",
-  "types": "lib/index.d.ts",
   "keywords": [
     "coc",
     "coc.nvim",
@@ -15,28 +14,81 @@
   "engines": {
     "coc": ">=0.0.82"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NitroCao/coc-codeql.git"
+  },
+  "homepage": "https://github.com/NitroCao/coc-codeql#readme",
+  "bugs": "https://github.com/NitroCao/coc-codeql/issues",
   "packageManager": "pnpm@12.5.1",
   "activationEvents": [
     "*"
   ],
+  "coc-test": {
+    "entryFile": "src/index.ts",
+    "setup": "scripts/test-setup.mjs"
+  },
+  "contributes": {
+    "configuration": {
+      "title": "CodeQL",
+      "properties": {
+        "codeql.cliPath": {
+          "type": "string",
+          "default": "codeql",
+          "description": "Path to the CodeQL CLI executable."
+        },
+        "codeql.languageServer.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Start the CodeQL language server (diagnostics, completion, hover, definition)."
+        },
+        "codeql.languageServer.checkErrors": {
+          "type": "string",
+          "enum": [
+            "ON_CHANGE",
+            "EXPLICIT"
+          ],
+          "default": "ON_CHANGE",
+          "description": "When to check for QL errors."
+        }
+      }
+    },
+    "commands": [
+      {
+        "title": "Restart the CodeQL language server",
+        "command": "codeql.restartLanguageServer"
+      }
+    ]
+  },
   "scripts": {
-    "build": "node esbuild.js",
-    "watch": "node esbuild.js --watch",
-    "typecheck": "tsc --noEmit",
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
+    "lint": "eslint .",
+    "lint:md": "markdownlint-cli2 '**/*.md' '#node_modules' '#.claude'",
+    "check": "pnpm typecheck && pnpm lint && pnpm lint:md",
+    "test": "coc-test 'test/*.test.ts'",
+    "test:variants": "COC_CODEQL_SETTINGS='{\"codeql\":{\"languageServer\":{\"enable\":false}}}' coc-test 'test/variants/no-language-server.test.ts' && COC_CODEQL_SETTINGS='{\"codeql\":{\"cliPath\":\"/nonexistent/codeql\"}}' coc-test 'test/variants/cli-not-found.test.ts'",
+    "test:all": "pnpm check && pnpm test && pnpm test:variants",
     "clean": "node -e \"require('fs').rmSync('lib',{recursive:true,force:true})\"",
-    "prepare": "node esbuild.js"
+    "prepare": "node esbuild.mjs"
   },
   "author": "nitrocao",
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "coc-test": "^0.2.0",
     "coc.nvim": "^0.0.83-next.9",
     "esbuild": "^0.24.2",
-    "typescript": "^5.7.2"
+    "eslint": "^9.39.5",
+    "markdownlint-cli2": "^0.23.3",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.70.1"
   },
   "files": [
     "lib",
     "lua",
+    "docs",
     "README.md",
     "LICENSE"
   ]

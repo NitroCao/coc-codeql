@@ -1,5 +1,4 @@
-/* eslint-disable @typescript-eslint/no-var-requires */
-const { build } = require('esbuild')
+import { build, context } from 'esbuild'
 
 const watch = process.argv.includes('--watch')
 const production = process.argv.includes('--production')
@@ -17,8 +16,7 @@ const options = {
 }
 
 if (watch) {
-  const ctx = require('esbuild').context
-  ctx(options).then((ctx) => {
+  context(options).then((ctx) => {
     console.log('[coc-codeql] watching for changes...')
     ctx.watch()
   })

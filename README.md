@@ -1,80 +1,145 @@
 # coc-codeql
 
 [CodeQL](https://codeql.github.com/) language support for
-[coc.nvim](https://github.com/neoclide/coc.nvim), migrated from the official
+[coc.nvim](https://github.com/neoclide/coc.nvim) — an editor companion
+to the CodeQL CLI, following the editing experience of the official
 [vscode-codeql](https://github.com/github/vscode-codeql) extension.
-
-This extension is **pure editor integration** — it does not bundle a
-tree-sitter parser or queries. Per tree-sitter ecosystem conventions,
-grammars belong to standalone projects and parsers are distributed by the
-host editor's tooling.
 
 ## Features
 
-- **Filetype detection** for `*.ql` / `*.qll` (Lua autocmds — coc.nvim does
-  not implement VSCode's `contributes.languages` detection)
-- **Language configuration**: `//` comment string, block comment
-  continuation, `formatoptions`
-- **Tree-sitter highlighting & folding** via `vim.treesitter.start()` for
-  the `ql` language, using whatever parser and queries your editor has
-  installed (see below)
+- **Language server integration** — diagnostics, completion, hover,
+  definition, references, document symbols, formatting, rename and
+  inlay hints, with pack resolution through the qlpack and the package
+  cache (`codeql pack install`)
+- **Filetype detection** for `*.ql` / `*.qll`
+- **Language configuration** — `//` line comments, block comment
+  continuation, comment-aware `formatoptions`
+- **Tree-sitter highlighting & folding**
+
+This extension is a pure editor integration: the language intelligence
+lives in the CodeQL CLI, the parser and highlight queries are provided
+by your editor's tree-sitter toolchain, and nothing is bundled here.
 
 ## Requirements
 
 - neovim ≥ 0.9 (developed and tested on 0.12)
 - coc.nvim ≥ 0.0.82
-- the `ql` tree-sitter parser, installed through the tree-sitter ecosystem:
+- the CodeQL CLI ≥ 2.x on `PATH` (or set `codeql.cliPath`)
+- the `ql` tree-sitter parser, installed through the tree-sitter
+  ecosystem:
 
 ```vim
 :TSInstall ql
 ```
 
-> nvim-treesitter registers the [tree-sitter-ql](https://github.com/samlanning/tree-sitter-ql)
-> grammar and ships its queries. Note: the revision currently pinned in
+> nvim-treesitter registers the
+> [tree-sitter-ql](https://github.com/samlanning/tree-sitter-ql)
+> grammar and ships its queries. The revision currently pinned in
 > nvim-treesitter's lockfile mis-parses `true()`/`false()` (QL has no
-> boolean literals); the fixed fork lives at
-> [tree-sitter-ql (fork)](https://github.com/samlanning/tree-sitter-ql) —
-> see that repo's README for installing it manually.
+> boolean literals); if that bites you, install a fixed parser build
+> into your nvim site directory manually (`:h treesitter-parsers`).
+> Without a parser, highlighting degrades gracefully with a warning;
+> every other feature works.
 
-## Install (development)
+## Install
 
-```sh
-# 1) register the extension with coc
-python3 - <<'EOF'
-import json, pathlib
-p = pathlib.Path("~/.config/coc/extensions/package.json").expanduser()
-pkg = json.loads(p.read_text())
-pkg["dependencies"]["coc-codeql"] = "file:/data/dev/coc-codeql"
-p.write_text(json.dumps(pkg, indent=2))
-EOF
-# 2) make node_modules/coc-codeql point at your working copy
-ln -sfn /data/dev/coc-codeql ~/.config/coc/extensions/node_modules/coc-codeql
-# 3) build
-cd /data/dev/coc-codeql && pnpm install && pnpm build
+```vim
+:CocInstall coc-codeql
 ```
 
-Restart neovim and open a `.ql` file.
+## Configuration
 
-## How it works
+```jsonc
+{
+  // Path to the CodeQL CLI executable: a name resolved on PATH
+  // (default "codeql") or an absolute path. Resolved once at
+  // activation; if it cannot be found, a warning is shown and the
+  // language-server features are disabled (editor features remain).
+  // Changing it requires :CocRestart.
+  "codeql.cliPath": "codeql",
 
-The extension activates at startup (`activationEvents: ["*"]` — required,
-since filetype detection itself is provided by this extension) and:
+  // Start the CodeQL language server at all. When false, no client and
+  // no commands are registered; filetype detection, language
+  // configuration and highlighting are unaffected.
+  "codeql.languageServer.enable": true,
 
-1. prepends its own directory to `runtimepath', exposing `lua/codeql.lua`;
-2. runs `require('codeql').setup()` (via `nvim_exec2`; nvim 0.12 removed the
-   `nvim_exec_lua` API) which registers filetype detection, applies the
-   language configuration and calls `vim.treesitter.start(buf, 'ql')`,
-   fixing up buffers loaded before activation.
+  // How the server checks for QL errors — passed as --check-errors.
+  //   "ON_CHANGE" (default): diagnostics are compiled and published
+  //     in the background as you edit (live diagnostics).
+  //   "EXPLICIT": the server runs no background checking and never
+  //     publishes diagnostics; useful to silence diagnostics on slow
+  //     machines or huge workspaces while keeping completion, hover
+  //     and definition. Despite the name, there is no way to request
+  //     checks on demand in the current protocol (verified against
+  //     CLI 2.27.0).
+  // Re-read whenever the server starts (activation or restart).
+  "codeql.languageServer.checkErrors": "ON_CHANGE"
+}
+```
 
-If the parser is missing, the extension degrades gracefully and tells you
-how to install it.
+Commands:
+
+| Command | Effect |
+| --- | --- |
+| `:CocCommand codeql.restartLanguageServer` | Restart the language server (re-reads `checkErrors`). |
+
+Protocol details and semantics:
+[docs/language-server.md](docs/language-server.md).
+
+## Development
+
+```sh
+pnpm build        # esbuild → lib/index.js (also runs on pnpm install)
+pnpm watch        # rebuild on change
+pnpm typecheck    # tsc --noEmit for src and tests
+pnpm lint         # eslint — errors on any @deprecated API usage
+pnpm lint:md      # markdownlint over all markdown files
+pnpm check        # typecheck + lint + lint:md
+pnpm test         # test/*.test.ts — the feature suite (coc-test)
+pnpm test:variants # test/variants/* — configuration-variant suites
+pnpm test:all     # check + both test suites
+```
+
+The LSP suites skip when `codeql` is not on `PATH`. The highlighting
+suites that need a real parser skip when none is found; point
+`COC_CODEQL_PARSER_DIR` at a directory containing `parser/ql.so` and
+`queries/ql/` to provide one. `test:variants` injects settings before
+activation through `COC_CODEQL_SETTINGS`
+(see `scripts/test-setup.mjs`).
 
 ## Roadmap
 
-- [ ] Language server (codeql query server) integration: diagnostics,
-      completion, definitions
-- [ ] `qlpack.yml` support
-- [ ] Query runner / quick evaluation
+Measured against vscode-codeql's feature set (query execution,
+database management, variant analysis, …), this extension currently
+implements the language-editing foundation. Plans:
+
+**Editing experience**
+
+- [x] Language server: diagnostics, completion, hover, definition,
+      references, document symbols, formatting, rename
+- [x] Syntax highlighting & folding (tree-sitter)
+- [x] Filetype detection and language configuration
+- [ ] Semantic tokens / richer highlighting from the server
+- [ ] Inlay hints exposure (the server supports them; coc wiring needed)
+
+**Query development**
+
+- [ ] Run query against the current database
+      (`codeql query run` / the query server)
+- [ ] Quick evaluation of the selected predicate/expressions
+- [ ] Results viewing (export to CSV/SARIF, a results buffer)
+- [ ] Query history
+- [ ] `.qltest` test running and output comparison
+
+**Database management**
+
+- [ ] Database selection UI (`:CocList`-style picker)
+- [ ] Database overview (language, upgrade hints)
+
+**Workspace & packs**
+
+- [ ] `codeql pack install` / dependency management commands
+- [ ] qlpack-aware workspace features (smart workspace detection)
 
 ## License
 

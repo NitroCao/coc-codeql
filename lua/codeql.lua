@@ -8,9 +8,10 @@
 ---   :TSInstall ql   (nvim-treesitter registers the tree-sitter-ql
 ---                    grammar and ships its queries)
 ---
---- or a manual install, see :h treesitter-parsers. Called from the coc
---- extension with `require('codeql').setup()` after this directory has
---- been prepended to 'runtimepath'.
+--- or a manual install, see :h treesitter-parsers.
+---
+--- Loaded by the coc extension through dofile() and exposed as the
+--- global `coc_codeql` (setup() is idempotent, so it can be re-run).
 
 local M = {}
 
@@ -23,14 +24,12 @@ local function start_highlight(buf)
   end
   local ok, err = pcall(vim.treesitter.start, buf, 'ql')
   if not ok then
-    vim.notify_once(
-      string.format(
-        '[coc-codeql] tree-sitter parser for ql not available (%s).\n'
-          .. 'Install it with `:TSInstall ql` (nvim-treesitter) or see :h treesitter-parsers.',
-        tostring(err):gsub('\n.*', '')
-      ),
-      vim.log.levels.WARN
-    )
+    -- No notifying from lua: vim.notify is hooked by coc.nvim into a
+    -- synchronous RPC handler, and any editor output from a scheduled
+    -- callback can wedge the RPC channel of embedded editors. Record the
+    -- failure; the extension's node side picks it up and warns through
+    -- coc's own message channel.
+    _G.coc_codeql_parser_error = tostring(err):gsub('\n.*', '')
   end
 end
 
@@ -51,7 +50,9 @@ local function on_filetype(buf)
   end
   vim.bo[buf].formatoptions = fo
 
-  start_highlight(buf)
+  -- Started from a timer: launching the highlighter inside the
+  -- FileType autocmd wedges nvim's embed channel (see test notes).
+  vim.fn.timer_start(50, function() start_highlight(buf) end)
 end
 
 function M.setup()

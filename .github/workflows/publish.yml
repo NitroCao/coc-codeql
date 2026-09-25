@@ -1,0 +1,56 @@
+# Publish to npm when a GitHub release is published.
+#
+# Authentication uses npm "trusted publishing" (OIDC): no npm token is
+# stored as a secret. Prerequisites, one-time setup on npmjs.com:
+#
+#   Package → Settings → Trusted Publishers → add this repository and
+#   the workflow filename `publish.yml` (for a not-yet-published name,
+#   configure it under your account's publishing settings first, or do
+#   one manual `npm publish` and then link it).
+#
+# Requires npm >= 11.5.1 for the OIDC exchange; node 24 ships npm 11.
+# If you prefer token-based publishing instead: create a granular
+# NPM_TOKEN secret and set `NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}`
+# on the publish step.
+#
+# Provenance is attached automatically with trusted publishing.
+#
+# Actions are pinned to full commit SHAs (GitHub security hardening
+# guidance); Dependabot (.github/dependabot.yml) keeps them current.
+# pnpm/setup — the successor of pnpm/action-setup — is deliberately
+# not used here: since pnpm 11, `pnpm runtime set node` drops the
+# bundled npm, and trusted publishing needs npm >= 11.5.1 on PATH.
+name: Publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+# Serialize publishes: npm rejects a duplicate version, and racing
+# runs would otherwise interleave their build/publish steps.
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+permissions:
+  id-token: write # npm trusted publishing
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Verify the release tag matches package.json
+        run: test "${GITHUB_REF_NAME#v}" = "$(npm pkg get version | tr -d '"')"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      # `npm publish` runs the `prepare` script (esbuild) before packing,
+      # so lib/ is built fresh inside the tarball.
+      - run: npm publish
